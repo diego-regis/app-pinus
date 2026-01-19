@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>PinusLens V2</title>
+    <script src="https://cdn.sheetjs.com/xlsx-0.19.3/package/dist/xlsx.full.min.js"></script>
+    <style>
+        body { margin: 0; background: #000; color: white; font-family: sans-serif; overflow: hidden; }
+        
+        /* Área Principal */
+        #app-container { display: flex; flex-direction: column; height: 100vh; }
+        #viewport { position: relative; flex-grow: 1; background: #000; overflow: hidden; }
+        video, canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain; }
+        
+        /* Lupa Aumentada e Mira */
+        #magnifier {
+            position: absolute; top: 10px; left: 10px; width: 160px; height: 160px; /* Maior */
+            border: 4px solid #00ff00; border-radius: 50%; overflow: hidden;
+            display: none; box-shadow: 0 0 15px rgba(0,0,0,0.8); z-index: 50; background: #000;
+        }
+        #magnifier canvas { width: 100%; height: 100%; object-fit: cover; }
+        #crosshair {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            width: 40px; height: 40px; border: 2px solid #ff0000; border-radius: 50%; pointer-events: none;
+        }
+        #crosshair::after {
+            content: '+'; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            color: #ff0000; font-size: 30px; font-weight: bold;
+        }
+
+        /* Controles */
+        #controls { background: #222; padding: 15px; border-top: 1px solid #444; z-index: 100; }
+        
+        .row { display: flex; gap: 10px; margin-bottom: 8px; justify-content: space-between; align-items: center; }
+        
+        input { background: #444; border: 1px solid #666; color: white; padding: 10px; border-radius: 5px; width: 70px; text-align: center; font-size: 1.1rem;}
+        label { font-size: 0.9rem; color: #ccc; }
+
+        button {
+            flex-grow: 1; padding: 15px; border: none; border-radius: 8px;
+            font-weight: bold; font-size: 1rem; cursor: pointer; text-transform: uppercase;
+        }
+        .btn-capture { background: #FF9800; color: white; }
+        .btn-height { background: #2E7D32; color: white; } /* Verde */
+        .btn-length { background: #1976D2; color: white; } /* Azul */
+        .btn-reset { background: #D32F2F; color: white; width: 50px; }
+        .btn-export { background: #555; color: white; width: 100%; margin-top: 10px; padding: 10px; font-size: 0.8rem; }
+
+        /* Instruções */
+        #status {
+            position: absolute; top: 20px; left: 50%; transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.8); padding: 10px 20px; border-radius: 30px;
+            font-size: 1rem; text-align: center; pointer-events: none; border: 1px solid #555; white-space: nowrap;
+        }
+        .highlight { color: #FF9800; font-weight: bold; }
+        .val-display { font-size: 1.5rem; font-weight: bold; color: #00ff00; }
+
+        /* Botões de Ação Final (Escondidos inicialmente) */
+        #action-buttons { display: none; flex-direction: row; gap: 10px; width: 100%; }
+    </style>
+</head>
+<body>
+
+    <div id="app-container">
+        <div id="viewport">
+            <video id="video" autoplay playsinline></video>
+            <canvas id="canvas"></canvas>
+            
+            <div id="magnifier">
+                <canvas id="magCanvas"></canvas>
+                <div id="crosshair"></div>
+            </div>
+            
+            <div id="status">📷 Tire foto com a Baliza</div>
+        </div>
+
+        <div id="controls">
+            <div class="row">
+                <div style="display:flex; flex-direction:column;">
+                    <label>Baliza (m)</label>
+                    <input type="number" id="refSize" value="2.00" step="0.1">
+                </div>
+                <div class="val-display" id="resultDisplay">0.00 m</div>
+            </div>
+            
+            <div class="row" id="capture-row">
+                <button class="btn-capture" onclick="capturePhoto()">📸 FOTOGRAFAR</button>
+            </div>
+
+            <div id="action-buttons">
+                <button class="btn-height" onclick="saveData('Altura')">Salvar ALTURA</button>
+                <button class="btn-length" onclick="saveData('Comprimento')">Salvar COMPRIM.</button>
+                <button class="btn-reset" onclick="resetApp()">↺</button>
+            </div>
+
+            <button class="btn-export" onclick="exportExcel()">📊 Exportar Excel (<span id="count">0</span>)</button>
+        </div>
+    </div>
+
+    <script>
+        // --- CONFIGURAÇÃO ---
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const magDiv = document.getElementById('magnifier');
+        const magCtx = document.getElementById('magCanvas').getContext('2d');
+        const statusEl = document.getElementById('status');
+        const resultDisplay = document.getElementById('resultDisplay');
+        
+        // Elementos de UI
+        const captureRow = document.getElementById('capture-row');
+        const actionButtons = document.getElementById('action-buttons');
+        const countSpan = document.getElementById('count');
+
+        // Estado do App
+        let state = 'CAMERA'; // CAMERA, REF_1, REF_2, MEASURE_1, MEASURE_2, DONE
+        let imageBitmap = null;
+        let points = { r1: null, r2: null, m1: null, m2: null };
+        let pxPerMeter = 0;
+        let dataStore = JSON.parse(localStorage.getItem('pinusDataV2')) || [];
+        
+        countSpan.innerText = dataStore.length;
+
+        // --- INICIALIZAÇÃO ---
+        async function startCamera() {
+            try {
+                // Tenta pegar a câmera traseira com melhor resolução
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: 'environment', width: { ideal: 4096 }, height: { ideal: 2160 } } 
+                });
+                video.srcObject = stream;
+            } catch (e) {
+                alert("Erro Câmera: " + e.message);
+            }
+        }
+        startCamera();
+
+        // Ajustar Canvas
+        video.addEventListener('loadedmetadata', () => {
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            // Configura resolução interna da lupa
+            document.getElementById('magCanvas').width = 300;
+            document.getElementById('magCanvas').height = 300;
+        });
+
+        // --- LÓGICA PRINCIPAL ---
+
+        function capturePhoto() {
+            // Congela a imagem no canvas
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            ctx.drawImage(video, 0, 0);
+            
+            // Salva bitmap para a lupa (performance)
+            createImageBitmap(canvas).then(bmp => { imageBitmap = bmp; });
+
+            // Muda interface
+            video.style.display = 'none';
+            captureRow.style.display = 'none';
+            
+            state = 'REF_1';
+            updateStatus();
+        }
+
+        function updateStatus() {
+            switch(state) {
+                case 'REF_1': statusEl.innerHTML = "Toque: <span class='highlight'>Ponta 1 da Baliza</span>"; break;
+                case 'REF_2': statusEl.innerHTML = "Toque: <span class='highlight'>Ponta 2 da Baliza</span>"; break;
+                case 'MEASURE_1': statusEl.innerHTML = "Toque: <span class='highlight'>Início da Medição</span>"; break;
+                case 'MEASURE_2': statusEl.innerHTML = "Toque: <span class='highlight'>Fim da Medição</span>"; break;
+                case 'DONE': 
+                    statusEl.innerHTML = "✅ Medição Pronta!"; 
+                    actionButtons.style.display = 'flex'; // Mostra botões de salvar
+                    break;
+            }
+        }
+
+        // --- MANIPULAÇÃO DE TOQUE E DESENHO ---
+
+        canvas.addEventListener('touchstart', handleTouch, {passive: false});
+        canvas.addEventListener('touchmove', handleTouch, {passive: false});
+        canvas.addEventListener('touchend', handleTouchEnd);
+        canvas.addEventListener('mousedown', handleTouch); // PC Debug
+        canvas.addEventListener('mouseup', handleTouchEnd); // PC Debug
+
+        function handleTouch(e) {
+            e.preventDefault();
+            if (state === 'DONE' || state === 'CAMERA') return;
+            
+            const pos = getPos(e);
+            showMagnifier(pos);
+        }
+
+        function handleTouchEnd(e) {
+            if (state === 'DONE' || state === 'CAMERA') return;
+            magDiv.style.display = 'none'; // Esconde lupa
+            
+            // Registra o ponto onde o dedo soltou
+            const pos = getPos(e); 
+            registerPoint(pos);
+        }
+
+        function getPos(e) {
+            const rect = canvas.getBoundingClientRect();
+            let cx, cy;
+            
+            if (e.changedTouches) {
+                cx = e.changedTouches[0].clientX;
+                cy = e.changedTouches[0].clientY;
+            } else {
+                cx = e.clientX;
+                cy = e.clientY;
+            }
+
+            // Regra de 3 para converter coordenada da tela em coordenada da foto real
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+
+            return { x: (cx - rect.left) * scaleX, y: (cy - rect.top) * scaleY, clientY: cy };
+        }
+
+        function showMagnifier(pos) {
+            magDiv.style.display = 'block';
+            
+            // Move a lupa para não ficar embaixo do dedo
+            const screenH = window.innerHeight;
+            magDiv.style.top = (pos.clientY < screenH/2) ? (screenH - 180) + 'px' : '20px';
+            magDiv.style.left = '20px';
+
+            if (imageBitmap) {
+                const zoom = 4; // Zoom potente
+                const sW = 75; // Área de captura na original
+                const sH = 75;
+                
+                magCtx.clearRect(0,0,300,300);
+                // Desenha recorte ampliado
+                magCtx.drawImage(imageBitmap, 
+                    pos.x - sW/2, pos.y - sH/2, sW, sH, 
+                    0, 0, 300, 300
+                );
+            }
+        }
+
+        function registerPoint(p) {
+            // Desenha PONTO GRANDE (Correção solicitada)
+            ctx.fillStyle = state.includes('REF') ? '#FF0000' : '#00FF00'; // Vermelho ou Verde
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, 15, 0, Math.PI*2); // Raio 15px (bem visível)
+            ctx.fill();
+            ctx.strokeStyle = "white";
+            ctx.lineWidth = 3;
+            ctx.stroke();
+
+            // Máquina de Estados
+            if (state === 'REF_1') {
+                points.r1 = p;
+                state = 'REF_2';
+            } else if (state === 'REF_2') {
+                points.r2 = p;
+                drawLine(points.r1, points.r2, 'red');
+                
+                // Calcula Escala
+                const distPx = Math.hypot(points.r2.x - points.r1.x, points.r2.y - points.r1.y);
+                const realM = parseFloat(document.getElementById('refSize').value);
+                pxPerMeter = distPx / realM;
+                
+                state = 'MEASURE_1';
+            } else if (state === 'MEASURE_1') {
+                points.m1 = p;
+                state = 'MEASURE_2';
+            } else if (state === 'MEASURE_2') {
+                points.m2 = p;
+                drawLine(points.m1, points.m2, '#00FF00');
+                
+                // Calcula Medida Final
+                const distPx = Math.hypot(points.m2.x - points.m1.x, points.m2.y - points.m1.y);
+                const finalM = distPx / pxPerMeter;
+                resultDisplay.innerText = finalM.toFixed(3) + " m";
+                
+                state = 'DONE';
+            }
+            updateStatus();
+        }
+
+        function drawLine(p1, p2, color) {
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 6; // Linha grossa
+            ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke();
+        }
+
+        // --- SALVAMENTO E EXPORTAÇÃO ---
+
+        function saveData(tipo) {
+            const valor = document.getElementById('resultDisplay').innerText;
+            const ref = document.getElementById('refSize').value;
+            
+            const novoDado = {
+                id: dataStore.length + 1,
+                data: new Date().toLocaleString(),
+                tipo: tipo, // "Altura" ou "Comprimento"
+                valor: valor,
+                baliza: ref + 'm'
+            };
+
+            dataStore.push(novoDado);
+            localStorage.setItem('pinusDataV2', JSON.stringify(dataStore));
+            
+            countSpan.innerText = dataStore.length;
+            
+            // Reinicia automaticamente para agilizar
+            resetApp();
+            
+            // Pequeno feedback visual
+            alert(`${tipo} Salvo: ${valor}`);
+        }
+
+        function resetApp() {
+            state = 'CAMERA';
+            points = { r1: null, r2: null, m1: null, m2: null };
+            video.style.display = 'block';
+            captureRow.style.display = 'flex';
+            actionButtons.style.display = 'none';
+            resultDisplay.innerText = "0.00 m";
+            statusEl.innerText = "📷 Tire foto com a Baliza";
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+
+        function exportExcel() {
+            if(dataStore.length === 0) return alert("Sem dados para exportar!");
+            
+            const ws = XLSX.utils.json_to_sheet(dataStore);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Levantamento");
+            XLSX.writeFile(wb, `Pinus_Levantamento_${new Date().getTime()}.xlsx`);
+        }
+    </script>
+</body>
+</html>
