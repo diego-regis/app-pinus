@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>PinusSniper V6</title>
+    <title>PinusSniper V8 Pro</title>
     
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="theme-color" content="#000000">
@@ -13,11 +13,10 @@
     <style>
         body { margin: 0; background: #000; color: white; font-family: sans-serif; overflow: hidden; user-select: none; }
         
-        /* Viewport Principal */
         #viewport { position: relative; width: 100vw; height: 100vh; overflow: hidden; background: #000; }
         #image-layer { transform-origin: 0 0; will-change: transform; }
         
-        /* Mira */
+        /* --- MIRA (Alt/Comp) --- */
         #crosshair-layer {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             pointer-events: none; display: flex; justify-content: center; align-items: center; z-index: 10;
@@ -32,7 +31,38 @@
             background: red; transform: translate(-50%, -50%); border-radius: 50%;
         }
 
-        /* Marcadores */
+        /* --- GRADE DE PONTOS (Fe) --- */
+        #grid-layer {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            display: none; justify-content: center; align-items: center; z-index: 15;
+            pointer-events: none; /* Deixa passar click para foto, mas os dots terão pointer-events: auto */
+        }
+        /* Caixa Amarela de 1m2 (visual) */
+        .grid-box {
+            width: 300px; height: 300px;
+            border: 3px dashed #FFD700;
+            display: grid; grid-template-columns: repeat(5, 1fr); grid-template-rows: repeat(5, 1fr);
+            background: rgba(0,0,0,0.2);
+            position: relative;
+        }
+        /* Os Pontos */
+        .dot-btn {
+            width: 100%; height: 100%;
+            display: flex; justify-content: center; align-items: center;
+            pointer-events: auto; /* Permite clicar no ponto */
+        }
+        .dot-circle {
+            width: 16px; height: 16px; border-radius: 50%;
+            background: rgba(255, 0, 0, 0.6); /* Vermelho = Vazio */
+            border: 2px solid white;
+            transition: background 0.2s;
+        }
+        .dot-btn.active .dot-circle {
+            background: #00ff00; /* Verde = Madeira */
+            transform: scale(1.2); box-shadow: 0 0 5px #00ff00;
+        }
+
+        /* Marcadores Normais */
         .marker {
             position: absolute; width: 24px; height: 24px; 
             transform: translate(-50%, -50%);
@@ -41,61 +71,65 @@
             font-size: 14px; display: flex; justify-content: center; align-items: center; color: white; font-weight: bold;
         }
 
-        /* UI Inferior */
+        /* --- UI --- */
         #ui-layer {
             position: absolute; bottom: 0; left: 0; width: 100%;
-            background: rgba(15, 15, 15, 0.95); padding: 15px; box-sizing: border-box;
-            border-top: 1px solid #333; z-index: 20; padding-bottom: 25px;
-            display: flex; flex-direction: column; gap: 10px;
+            background: rgba(15, 15, 15, 0.96); padding: 10px; box-sizing: border-box;
+            border-top: 1px solid #333; z-index: 20; padding-bottom: 20px;
+            display: flex; flex-direction: column; gap: 8px;
         }
 
         .top-info {
             position: absolute; top: 0; left: 0; width: 100%;
-            padding: 15px; background: linear-gradient(to bottom, rgba(0,0,0,0.9), transparent);
+            padding: 10px; background: linear-gradient(to bottom, rgba(0,0,0,0.9), transparent);
             text-align: center; z-index: 20; pointer-events: none;
         }
 
         /* Botões */
         button {
-            padding: 16px; border: none; border-radius: 8px;
-            font-weight: bold; font-size: 1.1rem; text-transform: uppercase; cursor: pointer;
-            width: 100%; outline: none; box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+            padding: 12px; border: none; border-radius: 6px;
+            font-weight: bold; font-size: 0.95rem; text-transform: uppercase; cursor: pointer;
+            width: 100%; outline: none; box-shadow: 0 2px 4px rgba(0,0,0,0.4); color: white;
         }
-        button:active { transform: scale(0.97); }
+        button:active { transform: scale(0.98); }
         
-        .btn-camera { background: #FF9800; color: white; }
-        .btn-mark { background: #D32F2F; color: white; font-size: 1.3rem; border: 2px solid white; height: 75px; }
-        .btn-save-h { background: #2E7D32; color: white; }
-        .btn-save-l { background: #1976D2; color: white; }
-        .btn-list { background: #444; color: white; font-size: 0.9rem; padding: 12px; }
-        .btn-undo { background: #555; color: white; width: 70px; }
+        .btn-measure { background: #FF9800; }
+        .btn-fe { background: #9C27B0; } /* Roxo para FE */
+        .btn-mark { background: #D32F2F; font-size: 1.2rem; height: 60px; border: 2px solid white; }
+        .btn-confirm-fe { background: #2E7D32; font-size: 1.1rem; height: 50px; }
+        .btn-save-pile { background: #2E7D32; font-size: 1.1rem; margin-top: 5px; }
+        .btn-sec { background: #444; font-size: 0.85rem; padding: 10px; }
 
-        .row { display: flex; gap: 10px; }
-        input { padding: 10px; width: 80px; text-align: center; border-radius: 5px; border: none; background: #333; color: white; font-size: 1.1rem; }
+        .row { display: flex; gap: 8px; }
+        .input-group { display: flex; flex-direction: column; gap: 2px; flex: 1; }
+        .input-group label { font-size: 0.7rem; color: #aaa; text-align: center; }
+        input { padding: 8px; width: 100%; text-align: center; border-radius: 5px; border: none; background: #333; color: white; font-size: 1rem; box-sizing: border-box; }
 
-        /* Modal de Histórico */
+        /* Painel de Resultados */
+        #result-panel {
+            background: #222; padding: 8px; border-radius: 8px;
+            display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 5px; text-align: center;
+        }
+        .res-box { background: #333; padding: 5px; border-radius: 4px; }
+        .res-val { color: #fff; font-weight: bold; font-size: 1rem; display: block; }
+        .res-label { font-size: 0.65rem; color: #aaa; }
+        .res-total { grid-column: span 3; border-top: 1px solid #555; margin-top: 5px; padding-top: 5px; display: flex; justify-content: space-around; }
+        .big-val { font-size: 1.1rem; color: #FFD700; font-weight: bold; }
+
+        /* Modal */
         #history-modal {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             background: #111; z-index: 100; display: none; flex-direction: column;
         }
-        #history-header {
-            padding: 20px; background: #222; display: flex; justify-content: space-between; align-items: center;
-            border-bottom: 1px solid #444;
-        }
-        #history-content {
-            flex-grow: 1; overflow-y: auto; padding: 10px;
-        }
-        table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
-        th { text-align: left; color: #888; padding: 10px 5px; border-bottom: 1px solid #444; }
-        td { padding: 12px 5px; border-bottom: 1px solid #333; color: #ddd; }
-        .val-col { color: #00ff00; font-weight: bold; }
-        .del-btn { background: #D32F2F; padding: 5px 10px; font-size: 0.8rem; border-radius: 4px; width: auto; }
+        #history-content { flex-grow: 1; overflow-y: auto; padding: 10px; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.75rem; }
+        th, td { padding: 8px 4px; border-bottom: 1px solid #333; color: #ddd; text-align: center; }
+        th { color: #888; background: #222; }
 
-        /* Toast */
         #toast {
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            background: rgba(0,0,0,0.9); color: #00ff00; padding: 20px 40px; border-radius: 15px;
-            font-size: 1.5rem; display: none; z-index: 150; border: 2px solid #00ff00;
+            background: rgba(0,0,0,0.9); color: #00ff00; padding: 15px 30px; border-radius: 10px;
+            font-size: 1.2rem; display: none; z-index: 150; border: 2px solid #00ff00; white-space: nowrap;
         }
     </style>
 </head>
@@ -112,290 +146,350 @@
         
         <div id="crosshair-layer" style="display:none;"><div class="crosshair"></div></div>
 
+        <div id="grid-layer">
+            <div class="grid-box" id="dots-container">
+                </div>
+        </div>
+
         <div class="top-info">
-            <span id="status-text" style="font-size: 1.2rem; font-weight: bold; color: #fff;">📷 Modo Câmera</span>
-            <div id="instruction-text" style="font-size: 0.9rem; color: #ccc;">Aponte para a pilha</div>
+            <span id="status-text" style="font-size: 1.1rem; font-weight: bold; color: #fff;">📷 Nova Pilha</span>
+            <div id="instruction-text" style="font-size: 0.8rem; color: #ccc;">Configure e meça</div>
         </div>
 
         <div id="ui-layer">
-            <div class="row" style="justify-content: space-between; align-items: center; margin-bottom: 5px;">
-                <div>Baliza: <input type="number" id="ref-size" value="2.00" step="0.1"> m</div>
-                <div id="measure-result" style="font-size: 1.3rem; color: #00ff00; font-weight: bold;">0.00 m</div>
+            
+            <div class="row" id="config-row">
+                <div class="input-group"><label>Baliza (m)</label><input type="number" id="ref-size" value="2.00" step="0.1"></div>
+                <div class="input-group"><label>Tora (m)</label><input type="number" id="wood-size" value="3.00" step="0.1"></div>
             </div>
 
-            <div id="btn-container">
-                <button class="btn-camera" onclick="takePhoto()">📸 Capturar</button>
+            <div id="result-panel">
+                <div class="res-box"><span class="res-val" id="disp-height">--</span><span class="res-label">ALTURA</span></div>
+                <div class="res-box"><span class="res-val" id="disp-length">--</span><span class="res-label">COMPR.</span></div>
+                <div class="res-box"><span class="res-val" id="disp-fe">--</span><span class="res-label">FE (0)</span></div>
+                
+                <div class="res-total">
+                    <div>Estéreo: <span id="vol-st" class="big-val">0.00</span></div>
+                    <div>Sólido: <span id="vol-sol" class="big-val" style="color:#00ff00">0.00</span></div>
+                </div>
             </div>
+
+            <div id="main-btns" style="display:flex; flex-direction:column; gap:8px;">
+                <div class="row">
+                    <button class="btn-measure" onclick="startMeasure('HEIGHT')">📏 Altura</button>
+                    <button class="btn-measure" style="background:#1565C0" onclick="startMeasure('LENGTH')">📏 Comprim.</button>
+                </div>
+                <button class="btn-fe" onclick="startFe()">📸 Amostra Fe (Fator)</button>
+            </div>
+
+            <button id="btn-save-pile" class="btn-save-pile" style="display:none;" onclick="savePile()">💾 SALVAR PILHA</button>
 
             <div id="edit-controls" class="row" style="display:none;">
-                <button class="btn-undo" onclick="undoPoint()">↩</button>
-                <button class="btn-mark" onclick="markPoint()">🎯 MARCAR</button>
+                <button class="btn-sec" onclick="undoPoint()" style="width:60px;">↩</button>
+                <button class="btn-mark" onclick="markPoint()">🎯 MARCAR PONTO</button>
             </div>
 
-            <div id="save-controls" class="row" style="display:none;">
-                <button class="btn-save-h" onclick="saveSafe('Altura')">Salvar ALTURA</button>
-                <button class="btn-save-l" onclick="saveSafe('Comprimento')">Salvar COMP.</button>
-            </div>
-            
-            <div id="retry-btn" style="display:none; margin-top:5px;">
-                <button style="background:#444; padding: 12px; font-size: 0.9rem;" onclick="resetApp()">🗑️ Descartar</button>
+            <div id="fe-controls" class="row" style="display:none;">
+                <button class="btn-sec" onclick="resetToCamera()" style="width:60px;">❌</button>
+                <button class="btn-confirm-fe" onclick="confirmFe()">✅ CONFIRMAR (<span id="fe-count-live">0</span>%)</button>
             </div>
 
-            <div class="row" style="margin-top: 10px;">
-                <button class="btn-list" onclick="toggleHistory()">📜 Ver Lista (<span id="data-count">0</span>)</button>
-                <button class="btn-list" style="background: #1976D2;" onclick="exportExcel()">📂 Excel</button>
+            <div class="row" style="margin-top: 5px;">
+                <button class="btn-sec" onclick="toggleHistory()">📜 Lista (<span id="data-count">0</span>)</button>
+                <button class="btn-sec" onclick="exportExcel()">📂 Excel</button>
             </div>
         </div>
     </div>
 
     <div id="history-modal">
-        <div id="history-header">
-            <h3 style="margin:0;">Histórico de Medições</h3>
-            <button style="width: auto; padding: 10px 20px; background: #555;" onclick="toggleHistory()">Fechar X</button>
+        <div style="padding:15px; border-bottom:1px solid #444; display:flex; justify-content:space-between; align-items:center;">
+            <h3>Histórico</h3>
+            <button style="width:auto; padding:8px 15px; background:#555;" onclick="toggleHistory()">X</button>
         </div>
         <div id="history-content">
             <table id="history-table">
-                <thead>
-                    <tr>
-                        <th>ID</th>
-                        <th>Tipo</th>
-                        <th>Valor</th>
-                        <th></th>
-                    </tr>
-                </thead>
-                <tbody id="history-body">
-                    </tbody>
+                <thead><tr><th>#</th><th>Dimensões</th><th>Fe</th><th>Vol Sol</th><th></th></tr></thead>
+                <tbody id="history-body"></tbody>
             </table>
-            <button onclick="clearAllData()" style="background: #D32F2F; margin-top: 20px;">🗑️ Apagar Tudo</button>
+            <button onclick="clearAllData()" style="background:#D32F2F; margin-top:20px;">🗑️ Limpar Tudo</button>
         </div>
     </div>
 
     <script>
-        // --- Setup ---
+        // --- Globais ---
         const video = document.getElementById('video-feed');
         const imgDisplay = document.getElementById('photo-display');
         const imgLayer = document.getElementById('image-layer');
-        const crosshair = document.getElementById('crosshair-layer');
         const markersContainer = document.getElementById('markers-container');
-        const historyModal = document.getElementById('history-modal');
-        const historyBody = document.getElementById('history-body');
+        const dotsContainer = document.getElementById('dots-container');
         
-        // UI Text
-        const statusText = document.getElementById('status-text');
-        const instrText = document.getElementById('instruction-text');
-        const resultDisp = document.getElementById('measure-result');
-        const toast = document.getElementById('toast');
-
-        // UI Groups
-        const btnContainer = document.getElementById('btn-container');
+        // UI Layers
+        const mainBtns = document.getElementById('main-btns');
         const editControls = document.getElementById('edit-controls');
-        const saveControls = document.getElementById('save-controls');
-        const retryBtn = document.getElementById('retry-btn');
+        const feControls = document.getElementById('fe-controls');
+        const btnSavePile = document.getElementById('btn-save-pile');
+        const crosshair = document.getElementById('crosshair-layer');
+        const gridLayer = document.getElementById('grid-layer');
 
-        // Logic Vars
-        let state = 'CAMERA'; 
+        // Estado
+        let currentPile = { h: 0, l: 0, fe_samples: [] };
+        let activeMode = null; // 'HEIGHT', 'LENGTH', 'FE'
         let points = [];
         let pxPerMeter = 1;
         let transform = { x: 0, y: 0, scale: 1 };
-        let lastTouch = { x: 0, y: 0, dist: 0 };
+        let lastTouch = { dist: 0, x: 0, y: 0 };
         let isDragging = false;
         
-        // Carrega dados
-        let dataStore = [];
-        try { dataStore = JSON.parse(localStorage.getItem('pinusDataV6')) || []; } catch(e) {}
+        let dataStore = JSON.parse(localStorage.getItem('pinusDataV8')) || [];
         updateCount();
 
-        // --- Camera ---
+        // --- Init ---
         async function startCamera() {
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { facingMode: 'environment', width: { ideal: 4096 } } 
-                });
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: {ideal:4096} } });
                 video.srcObject = stream;
                 await video.play();
-            } catch(e) { console.log("Cam Error", e); }
+            } catch(e){}
         }
         startCamera();
+        createGrid(); // Cria os 25 pontos
 
-        // --- Ações ---
+        function createGrid() {
+            dotsContainer.innerHTML = '';
+            for(let i=0; i<25; i++) {
+                const btn = document.createElement('div');
+                btn.className = 'dot-btn';
+                btn.onclick = function() { 
+                    this.classList.toggle('active'); 
+                    updateFeLive();
+                };
+                btn.innerHTML = '<div class="dot-circle"></div>';
+                dotsContainer.appendChild(btn);
+            }
+        }
+
+        // --- Ações de Medição ---
+        function startMeasure(mode) {
+            activeMode = mode;
+            takePhoto();
+            crosshair.style.display = 'flex';
+            editControls.style.display = 'flex';
+            updateUI("Marque: Baliza (1-2) -> Pilha (3-4)");
+        }
+
+        function startFe() {
+            activeMode = 'FE';
+            takePhoto();
+            gridLayer.style.display = 'flex';
+            feControls.style.display = 'flex';
+            
+            // Reseta os pontos
+            document.querySelectorAll('.dot-btn').forEach(b => b.classList.remove('active'));
+            updateFeLive();
+            
+            updateUI("Enquadre a madeira e marque os pontos VERDES");
+        }
+
         function takePhoto() {
             const canvas = document.createElement('canvas');
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(video, 0, 0);
-            
+            canvas.getContext('2d').drawImage(video, 0, 0);
             imgDisplay.src = canvas.toDataURL('image/jpeg');
             imgDisplay.style.display = 'block';
             video.style.display = 'none';
             
-            state = 'MARKING';
-            resetUIForMarking();
-        }
-
-        function markPoint() {
-            const viewportW = window.innerWidth;
-            const viewportH = window.innerHeight;
-            const imgX = ((viewportW / 2) - transform.x) / transform.scale;
-            const imgY = ((viewportH / 2) - transform.y) / transform.scale;
-
-            points.push({ x: imgX, y: imgY });
+            mainBtns.style.display = 'none';
+            btnSavePile.style.display = 'none';
             
-            const m = document.createElement('div');
-            m.className = 'marker';
-            m.style.left = imgX + 'px';
-            m.style.top = imgY + 'px';
-            m.innerText = points.length;
-            m.style.borderColor = (points.length <= 2) ? '#ff4444' : '#00ff00';
-            markersContainer.appendChild(m);
-
-            checkProgress();
-        }
-
-        function undoPoint() {
-            if(points.length === 0) return resetApp();
-            points.pop();
-            if(markersContainer.lastChild) markersContainer.lastChild.remove();
-            checkProgress();
-        }
-
-        function checkProgress() {
-            const len = points.length;
-            if (len === 0) updateInfo("Marque BALIZA 1", "Zoom com 2 dedos");
-            else if (len === 1) updateInfo("Marque BALIZA 2", "Zoom com 2 dedos");
-            else if (len === 2) {
-                const dist = Math.hypot(points[1].x - points[0].x, points[1].y - points[0].y);
-                const refVal = parseFloat(document.getElementById('ref-size').value);
-                pxPerMeter = dist / refVal;
-                updateInfo("Marque INÍCIO Pilha", "Referência OK");
-            }
-            else if (len === 3) updateInfo("Marque FIM Pilha", "Último ponto");
-            else if (len === 4) {
-                const dist = Math.hypot(points[3].x - points[2].x, points[3].y - points[2].y);
-                const finalVal = dist / pxPerMeter;
-                resultDisp.innerText = finalVal.toFixed(2) + " m";
-                state = 'SAVING';
-                crosshair.style.display = 'none';
-                editControls.style.display = 'none';
-                saveControls.style.display = 'flex';
-                retryBtn.style.display = 'block';
-                updateInfo("Pronto!", "Salve Altura ou Comprimento");
-            }
-        }
-
-        // --- Gestão de Dados (Nova Função V6) ---
-        function saveSafe(tipo) {
-            try {
-                const val = resultDisp.innerText;
-                const ref = document.getElementById('ref-size').value;
-                
-                dataStore.push({
-                    id: Date.now(), // ID único
-                    time: new Date().toLocaleTimeString(),
-                    tipo: tipo,
-                    valor: val,
-                    ref: ref
-                });
-                
-                localStorage.setItem('pinusDataV6', JSON.stringify(dataStore));
-                updateCount();
-                
-                toast.style.display = 'block';
-                setTimeout(() => { toast.style.display = 'none'; resetApp(); }, 1000);
-            } catch(e) { alert("Erro salvar"); resetApp(); }
-        }
-
-        function toggleHistory() {
-            if (historyModal.style.display === 'flex') {
-                historyModal.style.display = 'none';
-            } else {
-                renderHistoryTable();
-                historyModal.style.display = 'flex';
-            }
-        }
-
-        function renderHistoryTable() {
-            historyBody.innerHTML = "";
-            // Mostra do mais recente para o mais antigo
-            dataStore.slice().reverse().forEach((item, index) => {
-                // O índice real no array original é: dataStore.length - 1 - index
-                const realIndex = dataStore.length - 1 - index;
-                
-                const row = `
-                    <tr>
-                        <td>#${dataStore.length - index}<br><small>${item.time}</small></td>
-                        <td>${item.tipo === 'Altura' ? '↕️ Alt' : '↔️ Comp'}</td>
-                        <td class="val-col">${item.valor}</td>
-                        <td><button class="del-btn" onclick="deleteItem(${realIndex})">X</button></td>
-                    </tr>
-                `;
-                historyBody.innerHTML += row;
-            });
-        }
-
-        function deleteItem(index) {
-            if(confirm("Apagar este item?")) {
-                dataStore.splice(index, 1);
-                localStorage.setItem('pinusDataV6', JSON.stringify(dataStore));
-                updateCount();
-                renderHistoryTable(); // Atualiza a tabela aberta
-            }
-        }
-
-        function clearAllData() {
-            if(confirm("ATENÇÃO: Isso apagará TUDO. Continuar?")) {
-                dataStore = [];
-                localStorage.setItem('pinusDataV6', JSON.stringify(dataStore));
-                updateCount();
-                renderHistoryTable();
-            }
-        }
-
-        function updateCount() {
-            document.getElementById('data-count').innerText = dataStore.length;
-        }
-
-        // --- Core ---
-        function resetApp() {
-            state = 'CAMERA';
             points = [];
-            transform = { x: 0, y: 0, scale: 1 };
             markersContainer.innerHTML = '';
-            imgDisplay.style.display = 'none';
-            resultDisp.innerText = "0.00 m";
-            btnContainer.style.display = 'block';
-            editControls.style.display = 'none';
-            saveControls.style.display = 'none';
-            crosshair.style.display = 'none';
-            retryBtn.style.display = 'none';
-            updateInfo("📷 Modo Câmera", "Aponte para a pilha");
+            transform = { x: 0, y: 0, scale: 1 };
             updateTransform();
+        }
+
+        // --- Lógica Dimensões (Height/Length) ---
+        function markPoint() {
+            if(activeMode === 'FE') return;
+            const vw = window.innerWidth, vh = window.innerHeight;
+            const imgX = ((vw/2) - transform.x)/transform.scale;
+            const imgY = ((vh/2) - transform.y)/transform.scale;
+            
+            points.push({x:imgX, y:imgY});
+            renderMarker(imgX, imgY, points.length);
+
+            if(points.length === 2) {
+                const dist = Math.hypot(points[1].x-points[0].x, points[1].y-points[0].y);
+                pxPerMeter = dist / parseFloat(document.getElementById('ref-size').value);
+            }
+            if(points.length === 4) {
+                const dist = Math.hypot(points[3].x-points[2].x, points[3].y-points[2].y);
+                const val = dist / pxPerMeter;
+                
+                if(activeMode === 'HEIGHT') {
+                    currentPile.h = val;
+                    document.getElementById('disp-height').innerText = val.toFixed(2) + " m";
+                } else {
+                    currentPile.l = val;
+                    document.getElementById('disp-length').innerText = val.toFixed(2) + " m";
+                }
+                calcTotals();
+                resetToCamera();
+            }
+        }
+
+        function renderMarker(x, y, num) {
+            const m = document.createElement('div');
+            m.className = 'marker'; m.style.left = x+'px'; m.style.top = y+'px';
+            m.innerText = num; m.style.borderColor = (num<=2)?'red':'#00ff00';
+            markersContainer.appendChild(m);
+        }
+
+        // --- Lógica FE (Fator Empilhamento) ---
+        function updateFeLive() {
+            const active = document.querySelectorAll('.dot-btn.active').length;
+            const pct = (active / 25).toFixed(2);
+            document.getElementById('fe-count-live').innerText = pct;
+        }
+
+        function confirmFe() {
+            const active = document.querySelectorAll('.dot-btn.active').length;
+            const feVal = active / 25;
+            
+            currentPile.fe_samples.push(feVal);
+            
+            // Calcula Média
+            const sum = currentPile.fe_samples.reduce((a,b)=>a+b, 0);
+            const avg = sum / currentPile.fe_samples.length;
+            
+            document.getElementById('disp-fe').innerText = avg.toFixed(2);
+            document.querySelector('.res-label:nth-child(2)', document.getElementById('disp-fe').parentElement).innerText = `FE (${currentPile.fe_samples.length})`;
+            
+            calcTotals();
+            resetToCamera();
+            
+            showToast(`Amostra: ${feVal.toFixed(2)}`);
+        }
+
+        // --- Cálculos e Reset ---
+        function calcTotals() {
+            const w = parseFloat(document.getElementById('wood-size').value);
+            const st = (currentPile.h > 0 && currentPile.l > 0) ? (currentPile.h * currentPile.l * w) : 0;
+            
+            let fe = 0;
+            if(currentPile.fe_samples.length > 0) {
+                fe = currentPile.fe_samples.reduce((a,b)=>a+b,0) / currentPile.fe_samples.length;
+            }
+
+            const sol = st * (fe || 0); // Se não tiver fe, solido é 0 ou igual estereo? Geralmente 0 até medir.
+            
+            document.getElementById('vol-st').innerText = st.toFixed(2);
+            document.getElementById('vol-sol').innerText = sol.toFixed(2);
+            
+            // Habilita Salvar se tiver dimensões
+            if(st > 0) btnSavePile.style.display = 'block';
+        }
+
+        function resetToCamera() {
+            imgDisplay.style.display = 'none';
             video.style.display = 'block';
+            crosshair.style.display = 'none';
+            gridLayer.style.display = 'none';
+            
+            editControls.style.display = 'none';
+            feControls.style.display = 'none';
+            mainBtns.style.display = 'flex';
+            
+            if(parseFloat(document.getElementById('vol-st').innerText) > 0) btnSavePile.style.display = 'block';
+            
+            updateUI("📷 Nova Pilha / Próxima Medida");
             video.play().catch(e=>{});
         }
 
-        function updateInfo(main, sub) {
-            statusText.innerText = main;
-            instrText.innerText = sub;
+        function savePile() {
+            const wood = parseFloat(document.getElementById('wood-size').value);
+            const st = parseFloat(document.getElementById('vol-st').innerText);
+            const sol = parseFloat(document.getElementById('vol-sol').innerText);
+            const feStr = currentPile.fe_samples.map(f=>f.toFixed(2)).join(', ');
+            
+            // Média Fe
+            let feAvg = 0;
+            if(currentPile.fe_samples.length > 0) feAvg = currentPile.fe_samples.reduce((a,b)=>a+b,0)/currentPile.fe_samples.length;
+
+            dataStore.push({
+                id: dataStore.length + 1,
+                date: new Date().toLocaleString(),
+                h: currentPile.h.toFixed(2),
+                l: currentPile.l.toFixed(2),
+                w: wood.toFixed(2),
+                st: st.toFixed(2),
+                fe: feAvg.toFixed(2),
+                samples: feStr,
+                sol: sol.toFixed(2)
+            });
+            
+            localStorage.setItem('pinusDataV8', JSON.stringify(dataStore));
+            updateCount();
+            showToast("PILHA SALVA!");
+            
+            // Limpa dados da pilha atual
+            currentPile = { h:0, l:0, fe_samples:[] };
+            document.getElementById('disp-height').innerText = "--";
+            document.getElementById('disp-length').innerText = "--";
+            document.getElementById('disp-fe').innerText = "--";
+            calcTotals();
+            btnSavePile.style.display = 'none';
         }
 
-        function resetUIForMarking() {
-            btnContainer.style.display = 'none';
-            editControls.style.display = 'flex';
-            crosshair.style.display = 'flex';
-            updateInfo("Marque BALIZA 1", "Use zoom (2 dedos)");
+        // --- Helpers ---
+        function updateUI(msg) {
+            document.getElementById('status-text').innerText = activeMode ? activeMode : "Modo Câmera";
+            document.getElementById('instruction-text').innerText = msg;
+        }
+        function undoPoint() { points.pop(); markersContainer.lastChild?.remove(); }
+        function updateCount() { document.getElementById('data-count').innerText = dataStore.length; }
+        function showToast(msg) { const t = document.getElementById('toast'); t.innerText=msg; t.style.display='block'; setTimeout(()=>t.style.display='none',1500); }
+
+        function toggleHistory() {
+            const m = document.getElementById('history-modal');
+            if(m.style.display==='flex') m.style.display='none';
+            else { renderHistory(); m.style.display='flex'; }
+        }
+        
+        function renderHistory() {
+            const b = document.getElementById('history-body'); b.innerHTML='';
+            dataStore.slice().reverse().forEach((d,i)=>{
+                const realIdx = dataStore.length-1-i;
+                b.innerHTML += `<tr>
+                    <td>#${d.id}</td>
+                    <td>${d.h}x${d.l}m</td>
+                    <td>${d.fe}</td>
+                    <td style="color:#00ff00;font-weight:bold">${d.sol}</td>
+                    <td><button style="background:red;padding:5px" onclick="delItem(${realIdx})">X</button></td>
+                </tr>`;
+            });
+        }
+        function delItem(i) { if(confirm('Apagar?')) { dataStore.splice(i,1); localStorage.setItem('pinusDataV8', JSON.stringify(dataStore)); renderHistory(); updateCount(); } }
+        function clearAllData() { if(confirm('TUDO?')) { dataStore=[]; localStorage.setItem('pinusDataV8','[]'); renderHistory(); updateCount(); } }
+
+        function exportExcel() {
+            if(!dataStore.length) return alert("Vazio");
+            const ws = XLSX.utils.json_to_sheet(dataStore);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Inventario");
+            XLSX.writeFile(wb, "PinusPro_V8.xlsx");
         }
 
         // --- Zoom ---
         const view = document.getElementById('viewport');
         view.addEventListener('touchstart', e => {
-            if(state !== 'MARKING') return;
+            if(imgDisplay.style.display==='none') return;
             isDragging = true;
             if(e.touches.length === 2) lastTouch.dist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
             else { lastTouch.x = e.touches[0].clientX; lastTouch.y = e.touches[0].clientY; }
         });
         view.addEventListener('touchmove', e => {
-            if(state !== 'MARKING' || !isDragging) return;
+            if(!isDragging) return;
             e.preventDefault();
             if(e.touches.length === 2) {
                 const newDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
@@ -407,18 +501,9 @@
                 lastTouch.x = e.touches[0].clientX;
                 lastTouch.y = e.touches[0].clientY;
             }
-            updateTransform();
+            imgLayer.style.transform = `translate(${transform.x}px, ${transform.y}px) scale(${transform.scale})`;
         });
         view.addEventListener('touchend', () => isDragging = false);
-        function updateTransform() { imgLayer.style.transform = `translate(${transform.x}px, ${transform.y}px) scale(${transform.scale})`; }
-
-        function exportExcel() {
-            if(dataStore.length === 0) return alert("Sem dados!");
-            const ws = XLSX.utils.json_to_sheet(dataStore);
-            const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, "Levantamento");
-            XLSX.writeFile(wb, "Levantamento_V6.xlsx");
-        }
     </script>
 </body>
 </html>
