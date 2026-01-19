@@ -3,79 +3,82 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>PinusSniper V4 (Stable)</title>
+    <title>PinusSniper App</title>
+    
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#000000">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌲</text></svg>">
+    <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌲</text></svg>">
+
     <script src="https://cdn.sheetjs.com/xlsx-0.19.3/package/dist/xlsx.full.min.js"></script>
     <style>
-        body { margin: 0; background: #000; color: white; font-family: sans-serif; overflow: hidden; }
+        body { margin: 0; background: #000; color: white; font-family: sans-serif; overflow: hidden; user-select: none; -webkit-user-select: none; }
         
-        /* O Mundo (Foto e Câmera) */
-        #viewport { 
-            position: relative; width: 100vw; height: 100vh; overflow: hidden; background: #000;
-        }
-        
+        #viewport { position: relative; width: 100vw; height: 100vh; overflow: hidden; background: #000; }
         #image-layer { transform-origin: 0 0; will-change: transform; }
         
-        /* Mira Estática (Sniper) */
+        /* Mira Estática */
         #crosshair-layer {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             pointer-events: none; display: flex; justify-content: center; align-items: center; z-index: 10;
         }
         .crosshair {
             width: 50px; height: 50px;
-            border: 2px solid #00ff00; border-radius: 5px; /* Quadrada para melhor enquadramento */
-            position: relative;
+            border: 2px solid #00ff00; border-radius: 5px; position: relative;
+            box-shadow: 0 0 10px rgba(0, 255, 0, 0.3);
         }
         .crosshair::after {
-            content: ''; position: absolute; top: 50%; left: 50%; width: 6px; height: 6px;
+            content: ''; position: absolute; top: 50%; left: 50%; width: 4px; height: 4px;
             background: red; transform: translate(-50%, -50%); border-radius: 50%;
         }
 
-        /* Marcadores Visuais */
+        /* Marcadores */
         .marker {
-            position: absolute; width: 20px; height: 20px; 
+            position: absolute; width: 24px; height: 24px; 
             transform: translate(-50%, -50%);
             border: 2px solid white; border-radius: 50%;
-            z-index: 5; background: rgba(0,0,0,0.3);
-            font-size: 12px; display: flex; justify-content: center; align-items: center; color: white; font-weight: bold;
+            z-index: 5; background: rgba(0,0,0,0.4);
+            font-size: 14px; display: flex; justify-content: center; align-items: center; color: white; font-weight: bold;
+            box-shadow: 0 0 5px black;
         }
 
-        /* UI e Controles */
+        /* UI */
         #ui-layer {
             position: absolute; bottom: 0; left: 0; width: 100%;
-            background: rgba(10, 10, 10, 0.9); padding: 15px; box-sizing: border-box;
-            border-top: 1px solid #333; z-index: 20;
+            background: rgba(15, 15, 15, 0.95); padding: 15px; box-sizing: border-box;
+            border-top: 1px solid #333; z-index: 20; padding-bottom: 25px; /* Espaço para gestos do Android */
             display: flex; flex-direction: column; gap: 10px;
         }
 
         .top-info {
             position: absolute; top: 0; left: 0; width: 100%;
-            padding: 15px; background: linear-gradient(to bottom, rgba(0,0,0,0.8), transparent);
-            text-align: center; z-index: 20; text-shadow: 1px 1px 2px black;
+            padding: 15px; background: linear-gradient(to bottom, rgba(0,0,0,0.9), transparent);
+            text-align: center; z-index: 20; text-shadow: 1px 1px 2px black; pointer-events: none;
         }
         
-        /* Botões Otimizados */
         button {
             padding: 16px; border: none; border-radius: 8px;
             font-weight: bold; font-size: 1.1rem; text-transform: uppercase; cursor: pointer;
-            width: 100%; box-shadow: 0 2px 4px rgba(0,0,0,0.5);
-            transition: transform 0.1s;
+            width: 100%; box-shadow: 0 4px 6px rgba(0,0,0,0.4); outline: none;
         }
-        button:active { transform: scale(0.98); }
+        button:active { transform: scale(0.97); }
         
         .btn-camera { background: #FF9800; color: white; }
-        .btn-mark { background: #D32F2F; color: white; font-size: 1.3rem; border: 2px solid white; height: 70px; }
-        .btn-save-h { background: #2E7D32; color: white; } /* Altura */
-        .btn-save-l { background: #1976D2; color: white; } /* Comprimento */
+        .btn-mark { background: #D32F2F; color: white; font-size: 1.3rem; border: 2px solid white; height: 75px; }
+        .btn-save-h { background: #2E7D32; color: white; }
+        .btn-save-l { background: #1976D2; color: white; }
         .btn-undo { background: #555; color: white; width: 70px; }
 
         .row { display: flex; gap: 10px; }
-        input { padding: 8px; width: 70px; text-align: center; border-radius: 5px; border: none; background: #333; color: white; font-size: 1rem; }
+        input { padding: 10px; width: 80px; text-align: center; border-radius: 5px; border: none; background: #333; color: white; font-size: 1.1rem; }
 
-        /* Notificação Toast */
         #toast {
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            background: rgba(0,0,0,0.85); color: #00ff00; padding: 20px 40px; border-radius: 10px;
-            font-size: 1.5rem; display: none; z-index: 100; border: 2px solid #00ff00;
+            background: rgba(0,0,0,0.9); color: #00ff00; padding: 25px 40px; border-radius: 15px;
+            font-size: 1.8rem; display: none; z-index: 100; border: 3px solid #00ff00; text-align: center;
         }
     </style>
 </head>
@@ -89,27 +92,22 @@
             <div id="markers-container"></div>
             <video id="video-feed" autoplay playsinline style="width: 100%; height: 100%; object-fit: contain;"></video>
         </div>
-
-        <div id="crosshair-layer" style="display:none;">
-            <div class="crosshair"></div>
-        </div>
+        
+        <div id="crosshair-layer" style="display:none;"><div class="crosshair"></div></div>
 
         <div class="top-info">
-            <span id="status-text" style="font-size: 1.2rem; font-weight: bold;">📷 Modo Câmera</span>
-            <div id="instruction-text" style="font-size: 0.9rem; color: #ddd; margin-top: 5px;">Aponte para a pilha</div>
+            <span id="status-text" style="font-size: 1.3rem; font-weight: bold; color: #fff;">📷 Modo Câmera</span>
+            <div id="instruction-text" style="font-size: 1rem; color: #ccc; margin-top: 5px;">Aponte para a pilha</div>
         </div>
 
         <div id="ui-layer">
-            
             <div class="row" style="justify-content: space-between; align-items: center; margin-bottom: 5px;">
-                <div>
-                    Ref Baliza: <input type="number" id="ref-size" value="2.00" step="0.1"> m
-                </div>
-                <div id="measure-result" style="font-size: 1.3rem; color: #00ff00; font-weight: bold;">0.00 m</div>
+                <div>Baliza: <input type="number" id="ref-size" value="2.00" step="0.1"> m</div>
+                <div id="measure-result" style="font-size: 1.4rem; color: #00ff00; font-weight: bold;">0.00 m</div>
             </div>
 
             <div id="btn-container">
-                <button class="btn-camera" onclick="takePhoto()">📸 Capturar Foto</button>
+                <button class="btn-camera" onclick="takePhoto()">📸 Capturar</button>
             </div>
 
             <div id="edit-controls" class="row" style="display:none;">
@@ -119,72 +117,59 @@
 
             <div id="save-controls" class="row" style="display:none;">
                 <button class="btn-save-h" onclick="saveSafe('Altura')">Salvar ALTURA</button>
-                <button class="btn-save-l" onclick="saveSafe('Comprimento')">Salvar COMPRIM.</button>
+                <button class="btn-save-l" onclick="saveSafe('Comprimento')">Salvar COMP.</button>
             </div>
             
             <div id="retry-btn" style="display:none; margin-top:5px;">
-                <button style="background:#555; padding: 10px; font-size: 0.9rem;" onclick="resetApp()">🗑️ Descartar e Reiniciar</button>
+                <button style="background:#444; padding: 12px; font-size: 0.9rem;" onclick="resetApp()">🗑️ Descartar</button>
             </div>
 
-            <div style="text-align:center; font-size:0.7rem; margin-top:10px; color:#666;">
-                Registros: <span id="data-count">0</span> | <a href="#" onclick="exportExcel()" style="color:#aaa;">Exportar Excel</a>
+            <div style="text-align:center; font-size:0.8rem; margin-top:12px; color:#666;">
+                Registros: <span id="data-count">0</span> | <a href="#" onclick="exportExcel()" style="color:#aaa; text-decoration: underline;">Baixar Excel</a>
             </div>
         </div>
     </div>
 
     <script>
-        // --- Setup ---
+        // Elementos e Estado
         const video = document.getElementById('video-feed');
         const imgDisplay = document.getElementById('photo-display');
         const imgLayer = document.getElementById('image-layer');
         const crosshair = document.getElementById('crosshair-layer');
         const markersContainer = document.getElementById('markers-container');
-        
-        // UI Text
         const statusText = document.getElementById('status-text');
         const instrText = document.getElementById('instruction-text');
         const resultDisp = document.getElementById('measure-result');
         const toast = document.getElementById('toast');
-
-        // UI Groups
         const btnContainer = document.getElementById('btn-container');
         const editControls = document.getElementById('edit-controls');
         const saveControls = document.getElementById('save-controls');
         const retryBtn = document.getElementById('retry-btn');
 
-        // Logic Vars
         let state = 'CAMERA'; 
         let points = [];
         let pxPerMeter = 1;
         let transform = { x: 0, y: 0, scale: 1 };
         let lastTouch = { x: 0, y: 0, dist: 0 };
         let isDragging = false;
-        
         let dataStore = [];
-        try {
-            dataStore = JSON.parse(localStorage.getItem('pinusDataV4')) || [];
-        } catch(e) { console.log('Erro LocalStorage', e); }
+        
+        try { dataStore = JSON.parse(localStorage.getItem('pinusDataV5')) || []; } catch(e) {}
         document.getElementById('data-count').innerText = dataStore.length;
 
-        // --- Camera Engine (Robustness Fix) ---
+        // Câmera
         async function startCamera() {
             try {
-                // Solicita câmera traseira
                 const stream = await navigator.mediaDevices.getUserMedia({ 
                     video: { facingMode: 'environment', width: { ideal: 4096 } } 
                 });
                 video.srcObject = stream;
-                // Força o play para garantir que não esteja pausado
                 await video.play();
-            } catch(e) {
-                alert("Erro ao iniciar câmera: " + e.message);
-            }
+            } catch(e) { console.log("Erro Cam", e); }
         }
-        startCamera(); // Inicia ao carregar
+        startCamera();
 
-        // --- Ação 1: Capturar ---
         function takePhoto() {
-            // Desenha o frame atual no canvas invisível e joga na tag IMG
             const canvas = document.createElement('canvas');
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
@@ -193,26 +178,20 @@
             
             imgDisplay.src = canvas.toDataURL('image/jpeg');
             imgDisplay.style.display = 'block';
-            video.style.display = 'none'; // Esconde vídeo, economiza GPU
+            video.style.display = 'none';
             
-            // Muda estado para Marcação
             state = 'MARKING';
             resetUIForMarking();
         }
 
-        // --- Ação 2: Marcar (Sniper Logic) ---
         function markPoint() {
-            // Calcula o ponto central da tela relativo à imagem com zoom
             const viewportW = window.innerWidth;
             const viewportH = window.innerHeight;
-            
-            // Reverte a matriz de transformação
             const imgX = ((viewportW / 2) - transform.x) / transform.scale;
             const imgY = ((viewportH / 2) - transform.y) / transform.scale;
 
             points.push({ x: imgX, y: imgY });
             
-            // Cria o marcador visual
             const m = document.createElement('div');
             m.className = 'marker';
             m.style.left = imgX + 'px';
@@ -220,7 +199,6 @@
             m.innerText = points.length;
             m.style.borderColor = (points.length <= 2) ? '#ff4444' : '#00ff00';
             markersContainer.appendChild(m);
-
             checkProgress();
         }
 
@@ -232,85 +210,49 @@
         }
 
         function checkProgress() {
-            // Lógica de feedback baseada no número de pontos
             const len = points.length;
-            
-            if (len === 0) updateInfo("Marque PONTA 1 da Baliza", "Use dois dedos para zoom/arrastar");
-            else if (len === 1) updateInfo("Marque PONTA 2 da Baliza", "Alinhe a mira e clique em MARCAR");
+            if (len === 0) updateInfo("Marque BALIZA 1", "Zoom com dois dedos");
+            else if (len === 1) updateInfo("Marque BALIZA 2", "Use a mira central");
             else if (len === 2) {
-                // Calculou Referência
                 const dist = Math.hypot(points[1].x - points[0].x, points[1].y - points[0].y);
                 const refVal = parseFloat(document.getElementById('ref-size').value);
                 pxPerMeter = dist / refVal;
-                updateInfo("Marque INÍCIO da Pilha", "Referência calibrada!");
+                updateInfo("Marque INÍCIO Pilha", "Referência OK");
             }
-            else if (len === 3) updateInfo("Marque FIM da Pilha", "Quase lá...");
+            else if (len === 3) updateInfo("Marque FIM Pilha", "Último ponto...");
             else if (len === 4) {
-                // Calculou Medida Final
                 const dist = Math.hypot(points[3].x - points[2].x, points[3].y - points[2].y);
                 const finalVal = dist / pxPerMeter;
                 resultDisp.innerText = finalVal.toFixed(2) + " m";
-                
-                // Vai para tela de Salvar
                 state = 'SAVING';
                 crosshair.style.display = 'none';
                 editControls.style.display = 'none';
                 saveControls.style.display = 'flex';
-                retryBtn.style.display = 'block'; // Permite descartar
-                updateInfo("Medida Pronta!", "Selecione o tipo para salvar");
+                retryBtn.style.display = 'block';
+                updateInfo("Medida Pronta!", "Selecione Altura ou Comprimento");
             }
         }
 
-        // --- Ação 3: Salvar Seguro (Anti-Crash) ---
         function saveSafe(tipo) {
             try {
                 const val = resultDisp.innerText;
                 const ref = document.getElementById('ref-size').value;
-                
-                // Salva no Array
-                dataStore.push({
-                    id: dataStore.length + 1,
-                    data: new Date().toLocaleString(),
-                    tipo: tipo,
-                    valor: val,
-                    ref: ref + 'm'
-                });
-                
-                // Persiste no LocalStorage
-                localStorage.setItem('pinusDataV4', JSON.stringify(dataStore));
+                dataStore.push({ id: dataStore.length + 1, data: new Date().toLocaleString(), tipo: tipo, valor: val, ref: ref + 'm' });
+                localStorage.setItem('pinusDataV5', JSON.stringify(dataStore));
                 document.getElementById('data-count').innerText = dataStore.length;
                 
-                // Feedback Visual (Toast)
-                showToast();
-
-                // Pequeno delay para usuário ver que salvou, depois reseta
-                setTimeout(() => {
-                    resetApp();
-                }, 800);
-
-            } catch(e) {
-                alert("Erro ao salvar: " + e.message);
-                resetApp(); // Tenta resetar mesmo com erro
-            }
-        }
-
-        function showToast() {
-            toast.style.display = 'block';
-            setTimeout(() => { toast.style.display = 'none'; }, 1500);
+                toast.style.display = 'block';
+                setTimeout(() => { toast.style.display = 'none'; resetApp(); }, 1000);
+            } catch(e) { alert("Erro ao salvar"); resetApp(); }
         }
 
         function resetApp() {
-            // Limpa Variáveis
             state = 'CAMERA';
             points = [];
             transform = { x: 0, y: 0, scale: 1 };
-            
-            // Limpa DOM
             markersContainer.innerHTML = '';
             imgDisplay.style.display = 'none';
             resultDisp.innerText = "0.00 m";
-            
-            // Restaura UI
             btnContainer.style.display = 'block';
             editControls.style.display = 'none';
             saveControls.style.display = 'none';
@@ -318,13 +260,10 @@
             retryBtn.style.display = 'none';
             updateInfo("📷 Modo Câmera", "Aponte para a pilha");
             updateTransform();
-
-            // REATIVA CÂMERA (Crucial para não travar)
             video.style.display = 'block';
-            video.play().catch(e => console.log("Video play request interrupted", e));
+            video.play().catch(e => {});
         }
 
-        // --- Helpers de UI ---
         function updateInfo(main, sub) {
             statusText.innerText = main;
             instrText.innerText = sub;
@@ -334,58 +273,41 @@
             btnContainer.style.display = 'none';
             editControls.style.display = 'flex';
             crosshair.style.display = 'flex';
-            updateInfo("Marque PONTA 1 da Baliza", "Use dois dedos para ampliar");
+            updateInfo("Marque BALIZA 1", "Use dois dedos para ampliar");
         }
 
-        // --- Engine de Zoom/Pan (Touch) ---
+        // Zoom Engine
         const view = document.getElementById('viewport');
-        
         view.addEventListener('touchstart', e => {
             if(state !== 'MARKING') return;
             isDragging = true;
-            if(e.touches.length === 2) lastTouch.dist = getDist(e.touches);
+            if(e.touches.length === 2) lastTouch.dist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
             else { lastTouch.x = e.touches[0].clientX; lastTouch.y = e.touches[0].clientY; }
         });
-
         view.addEventListener('touchmove', e => {
             if(state !== 'MARKING' || !isDragging) return;
             e.preventDefault();
-
             if(e.touches.length === 2) {
-                // Zoom
-                const newDist = getDist(e.touches);
-                const delta = newDist / lastTouch.dist;
-                transform.scale = Math.max(0.5, Math.min(transform.scale * delta, 8)); // Limite zoom 8x
+                const newDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+                transform.scale = Math.max(0.5, Math.min(transform.scale * (newDist / lastTouch.dist), 8));
                 lastTouch.dist = newDist;
             } else {
-                // Pan
-                const dx = e.touches[0].clientX - lastTouch.x;
-                const dy = e.touches[0].clientY - lastTouch.y;
-                transform.x += dx;
-                transform.y += dy;
+                transform.x += e.touches[0].clientX - lastTouch.x;
+                transform.y += e.touches[0].clientY - lastTouch.y;
                 lastTouch.x = e.touches[0].clientX;
                 lastTouch.y = e.touches[0].clientY;
             }
             updateTransform();
         });
-
         view.addEventListener('touchend', () => isDragging = false);
+        function updateTransform() { imgLayer.style.transform = `translate(${transform.x}px, ${transform.y}px) scale(${transform.scale})`; }
 
-        function getDist(touches) {
-            return Math.hypot(touches[0].clientX - touches[1].clientX, touches[0].clientY - touches[1].clientY);
-        }
-
-        function updateTransform() {
-            imgLayer.style.transform = `translate(${transform.x}px, ${transform.y}px) scale(${transform.scale})`;
-        }
-
-        // --- Exportação ---
         function exportExcel() {
             if(dataStore.length === 0) return alert("Sem dados!");
             const ws = XLSX.utils.json_to_sheet(dataStore);
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, "Inventario");
-            XLSX.writeFile(wb, "Levantamento_V4.xlsx");
+            XLSX.writeFile(wb, "Levantamento_V5.xlsx");
         }
     </script>
 </body>
