@@ -3,24 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>PinusSniper App</title>
+    <title>PinusSniper V6</title>
     
     <meta name="mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="theme-color" content="#000000">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌲</text></svg>">
-    <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌲</text></svg>">
 
     <script src="https://cdn.sheetjs.com/xlsx-0.19.3/package/dist/xlsx.full.min.js"></script>
     <style>
-        body { margin: 0; background: #000; color: white; font-family: sans-serif; overflow: hidden; user-select: none; -webkit-user-select: none; }
+        body { margin: 0; background: #000; color: white; font-family: sans-serif; overflow: hidden; user-select: none; }
         
+        /* Viewport Principal */
         #viewport { position: relative; width: 100vw; height: 100vh; overflow: hidden; background: #000; }
         #image-layer { transform-origin: 0 0; will-change: transform; }
         
-        /* Mira Estática */
+        /* Mira */
         #crosshair-layer {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             pointer-events: none; display: flex; justify-content: center; align-items: center; z-index: 10;
@@ -42,27 +39,27 @@
             border: 2px solid white; border-radius: 50%;
             z-index: 5; background: rgba(0,0,0,0.4);
             font-size: 14px; display: flex; justify-content: center; align-items: center; color: white; font-weight: bold;
-            box-shadow: 0 0 5px black;
         }
 
-        /* UI */
+        /* UI Inferior */
         #ui-layer {
             position: absolute; bottom: 0; left: 0; width: 100%;
             background: rgba(15, 15, 15, 0.95); padding: 15px; box-sizing: border-box;
-            border-top: 1px solid #333; z-index: 20; padding-bottom: 25px; /* Espaço para gestos do Android */
+            border-top: 1px solid #333; z-index: 20; padding-bottom: 25px;
             display: flex; flex-direction: column; gap: 10px;
         }
 
         .top-info {
             position: absolute; top: 0; left: 0; width: 100%;
             padding: 15px; background: linear-gradient(to bottom, rgba(0,0,0,0.9), transparent);
-            text-align: center; z-index: 20; text-shadow: 1px 1px 2px black; pointer-events: none;
+            text-align: center; z-index: 20; pointer-events: none;
         }
-        
+
+        /* Botões */
         button {
             padding: 16px; border: none; border-radius: 8px;
             font-weight: bold; font-size: 1.1rem; text-transform: uppercase; cursor: pointer;
-            width: 100%; box-shadow: 0 4px 6px rgba(0,0,0,0.4); outline: none;
+            width: 100%; outline: none; box-shadow: 0 2px 5px rgba(0,0,0,0.5);
         }
         button:active { transform: scale(0.97); }
         
@@ -70,15 +67,35 @@
         .btn-mark { background: #D32F2F; color: white; font-size: 1.3rem; border: 2px solid white; height: 75px; }
         .btn-save-h { background: #2E7D32; color: white; }
         .btn-save-l { background: #1976D2; color: white; }
+        .btn-list { background: #444; color: white; font-size: 0.9rem; padding: 12px; }
         .btn-undo { background: #555; color: white; width: 70px; }
 
         .row { display: flex; gap: 10px; }
         input { padding: 10px; width: 80px; text-align: center; border-radius: 5px; border: none; background: #333; color: white; font-size: 1.1rem; }
 
+        /* Modal de Histórico */
+        #history-modal {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: #111; z-index: 100; display: none; flex-direction: column;
+        }
+        #history-header {
+            padding: 20px; background: #222; display: flex; justify-content: space-between; align-items: center;
+            border-bottom: 1px solid #444;
+        }
+        #history-content {
+            flex-grow: 1; overflow-y: auto; padding: 10px;
+        }
+        table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+        th { text-align: left; color: #888; padding: 10px 5px; border-bottom: 1px solid #444; }
+        td { padding: 12px 5px; border-bottom: 1px solid #333; color: #ddd; }
+        .val-col { color: #00ff00; font-weight: bold; }
+        .del-btn { background: #D32F2F; padding: 5px 10px; font-size: 0.8rem; border-radius: 4px; width: auto; }
+
+        /* Toast */
         #toast {
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            background: rgba(0,0,0,0.9); color: #00ff00; padding: 25px 40px; border-radius: 15px;
-            font-size: 1.8rem; display: none; z-index: 100; border: 3px solid #00ff00; text-align: center;
+            background: rgba(0,0,0,0.9); color: #00ff00; padding: 20px 40px; border-radius: 15px;
+            font-size: 1.5rem; display: none; z-index: 150; border: 2px solid #00ff00;
         }
     </style>
 </head>
@@ -96,14 +113,14 @@
         <div id="crosshair-layer" style="display:none;"><div class="crosshair"></div></div>
 
         <div class="top-info">
-            <span id="status-text" style="font-size: 1.3rem; font-weight: bold; color: #fff;">📷 Modo Câmera</span>
-            <div id="instruction-text" style="font-size: 1rem; color: #ccc; margin-top: 5px;">Aponte para a pilha</div>
+            <span id="status-text" style="font-size: 1.2rem; font-weight: bold; color: #fff;">📷 Modo Câmera</span>
+            <div id="instruction-text" style="font-size: 0.9rem; color: #ccc;">Aponte para a pilha</div>
         </div>
 
         <div id="ui-layer">
             <div class="row" style="justify-content: space-between; align-items: center; margin-bottom: 5px;">
                 <div>Baliza: <input type="number" id="ref-size" value="2.00" step="0.1"> m</div>
-                <div id="measure-result" style="font-size: 1.4rem; color: #00ff00; font-weight: bold;">0.00 m</div>
+                <div id="measure-result" style="font-size: 1.3rem; color: #00ff00; font-weight: bold;">0.00 m</div>
             </div>
 
             <div id="btn-container">
@@ -124,40 +141,71 @@
                 <button style="background:#444; padding: 12px; font-size: 0.9rem;" onclick="resetApp()">🗑️ Descartar</button>
             </div>
 
-            <div style="text-align:center; font-size:0.8rem; margin-top:12px; color:#666;">
-                Registros: <span id="data-count">0</span> | <a href="#" onclick="exportExcel()" style="color:#aaa; text-decoration: underline;">Baixar Excel</a>
+            <div class="row" style="margin-top: 10px;">
+                <button class="btn-list" onclick="toggleHistory()">📜 Ver Lista (<span id="data-count">0</span>)</button>
+                <button class="btn-list" style="background: #1976D2;" onclick="exportExcel()">📂 Excel</button>
             </div>
         </div>
     </div>
 
+    <div id="history-modal">
+        <div id="history-header">
+            <h3 style="margin:0;">Histórico de Medições</h3>
+            <button style="width: auto; padding: 10px 20px; background: #555;" onclick="toggleHistory()">Fechar X</button>
+        </div>
+        <div id="history-content">
+            <table id="history-table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Tipo</th>
+                        <th>Valor</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody id="history-body">
+                    </tbody>
+            </table>
+            <button onclick="clearAllData()" style="background: #D32F2F; margin-top: 20px;">🗑️ Apagar Tudo</button>
+        </div>
+    </div>
+
     <script>
-        // Elementos e Estado
+        // --- Setup ---
         const video = document.getElementById('video-feed');
         const imgDisplay = document.getElementById('photo-display');
         const imgLayer = document.getElementById('image-layer');
         const crosshair = document.getElementById('crosshair-layer');
         const markersContainer = document.getElementById('markers-container');
+        const historyModal = document.getElementById('history-modal');
+        const historyBody = document.getElementById('history-body');
+        
+        // UI Text
         const statusText = document.getElementById('status-text');
         const instrText = document.getElementById('instruction-text');
         const resultDisp = document.getElementById('measure-result');
         const toast = document.getElementById('toast');
+
+        // UI Groups
         const btnContainer = document.getElementById('btn-container');
         const editControls = document.getElementById('edit-controls');
         const saveControls = document.getElementById('save-controls');
         const retryBtn = document.getElementById('retry-btn');
 
+        // Logic Vars
         let state = 'CAMERA'; 
         let points = [];
         let pxPerMeter = 1;
         let transform = { x: 0, y: 0, scale: 1 };
         let lastTouch = { x: 0, y: 0, dist: 0 };
         let isDragging = false;
-        let dataStore = [];
         
-        try { dataStore = JSON.parse(localStorage.getItem('pinusDataV5')) || []; } catch(e) {}
-        document.getElementById('data-count').innerText = dataStore.length;
+        // Carrega dados
+        let dataStore = [];
+        try { dataStore = JSON.parse(localStorage.getItem('pinusDataV6')) || []; } catch(e) {}
+        updateCount();
 
-        // Câmera
+        // --- Camera ---
         async function startCamera() {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ 
@@ -165,10 +213,11 @@
                 });
                 video.srcObject = stream;
                 await video.play();
-            } catch(e) { console.log("Erro Cam", e); }
+            } catch(e) { console.log("Cam Error", e); }
         }
         startCamera();
 
+        // --- Ações ---
         function takePhoto() {
             const canvas = document.createElement('canvas');
             canvas.width = video.videoWidth;
@@ -199,6 +248,7 @@
             m.innerText = points.length;
             m.style.borderColor = (points.length <= 2) ? '#ff4444' : '#00ff00';
             markersContainer.appendChild(m);
+
             checkProgress();
         }
 
@@ -211,15 +261,15 @@
 
         function checkProgress() {
             const len = points.length;
-            if (len === 0) updateInfo("Marque BALIZA 1", "Zoom com dois dedos");
-            else if (len === 1) updateInfo("Marque BALIZA 2", "Use a mira central");
+            if (len === 0) updateInfo("Marque BALIZA 1", "Zoom com 2 dedos");
+            else if (len === 1) updateInfo("Marque BALIZA 2", "Zoom com 2 dedos");
             else if (len === 2) {
                 const dist = Math.hypot(points[1].x - points[0].x, points[1].y - points[0].y);
                 const refVal = parseFloat(document.getElementById('ref-size').value);
                 pxPerMeter = dist / refVal;
                 updateInfo("Marque INÍCIO Pilha", "Referência OK");
             }
-            else if (len === 3) updateInfo("Marque FIM Pilha", "Último ponto...");
+            else if (len === 3) updateInfo("Marque FIM Pilha", "Último ponto");
             else if (len === 4) {
                 const dist = Math.hypot(points[3].x - points[2].x, points[3].y - points[2].y);
                 const finalVal = dist / pxPerMeter;
@@ -229,23 +279,83 @@
                 editControls.style.display = 'none';
                 saveControls.style.display = 'flex';
                 retryBtn.style.display = 'block';
-                updateInfo("Medida Pronta!", "Selecione Altura ou Comprimento");
+                updateInfo("Pronto!", "Salve Altura ou Comprimento");
             }
         }
 
+        // --- Gestão de Dados (Nova Função V6) ---
         function saveSafe(tipo) {
             try {
                 const val = resultDisp.innerText;
                 const ref = document.getElementById('ref-size').value;
-                dataStore.push({ id: dataStore.length + 1, data: new Date().toLocaleString(), tipo: tipo, valor: val, ref: ref + 'm' });
-                localStorage.setItem('pinusDataV5', JSON.stringify(dataStore));
-                document.getElementById('data-count').innerText = dataStore.length;
+                
+                dataStore.push({
+                    id: Date.now(), // ID único
+                    time: new Date().toLocaleTimeString(),
+                    tipo: tipo,
+                    valor: val,
+                    ref: ref
+                });
+                
+                localStorage.setItem('pinusDataV6', JSON.stringify(dataStore));
+                updateCount();
                 
                 toast.style.display = 'block';
                 setTimeout(() => { toast.style.display = 'none'; resetApp(); }, 1000);
-            } catch(e) { alert("Erro ao salvar"); resetApp(); }
+            } catch(e) { alert("Erro salvar"); resetApp(); }
         }
 
+        function toggleHistory() {
+            if (historyModal.style.display === 'flex') {
+                historyModal.style.display = 'none';
+            } else {
+                renderHistoryTable();
+                historyModal.style.display = 'flex';
+            }
+        }
+
+        function renderHistoryTable() {
+            historyBody.innerHTML = "";
+            // Mostra do mais recente para o mais antigo
+            dataStore.slice().reverse().forEach((item, index) => {
+                // O índice real no array original é: dataStore.length - 1 - index
+                const realIndex = dataStore.length - 1 - index;
+                
+                const row = `
+                    <tr>
+                        <td>#${dataStore.length - index}<br><small>${item.time}</small></td>
+                        <td>${item.tipo === 'Altura' ? '↕️ Alt' : '↔️ Comp'}</td>
+                        <td class="val-col">${item.valor}</td>
+                        <td><button class="del-btn" onclick="deleteItem(${realIndex})">X</button></td>
+                    </tr>
+                `;
+                historyBody.innerHTML += row;
+            });
+        }
+
+        function deleteItem(index) {
+            if(confirm("Apagar este item?")) {
+                dataStore.splice(index, 1);
+                localStorage.setItem('pinusDataV6', JSON.stringify(dataStore));
+                updateCount();
+                renderHistoryTable(); // Atualiza a tabela aberta
+            }
+        }
+
+        function clearAllData() {
+            if(confirm("ATENÇÃO: Isso apagará TUDO. Continuar?")) {
+                dataStore = [];
+                localStorage.setItem('pinusDataV6', JSON.stringify(dataStore));
+                updateCount();
+                renderHistoryTable();
+            }
+        }
+
+        function updateCount() {
+            document.getElementById('data-count').innerText = dataStore.length;
+        }
+
+        // --- Core ---
         function resetApp() {
             state = 'CAMERA';
             points = [];
@@ -261,7 +371,7 @@
             updateInfo("📷 Modo Câmera", "Aponte para a pilha");
             updateTransform();
             video.style.display = 'block';
-            video.play().catch(e => {});
+            video.play().catch(e=>{});
         }
 
         function updateInfo(main, sub) {
@@ -273,10 +383,10 @@
             btnContainer.style.display = 'none';
             editControls.style.display = 'flex';
             crosshair.style.display = 'flex';
-            updateInfo("Marque BALIZA 1", "Use dois dedos para ampliar");
+            updateInfo("Marque BALIZA 1", "Use zoom (2 dedos)");
         }
 
-        // Zoom Engine
+        // --- Zoom ---
         const view = document.getElementById('viewport');
         view.addEventListener('touchstart', e => {
             if(state !== 'MARKING') return;
@@ -306,8 +416,8 @@
             if(dataStore.length === 0) return alert("Sem dados!");
             const ws = XLSX.utils.json_to_sheet(dataStore);
             const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, "Inventario");
-            XLSX.writeFile(wb, "Levantamento_V5.xlsx");
+            XLSX.utils.book_append_sheet(wb, ws, "Levantamento");
+            XLSX.writeFile(wb, "Levantamento_V6.xlsx");
         }
     </script>
 </body>
