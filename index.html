@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>PinusSniper V14 (Canvas Engine)</title>
+    <title>PinusSniper V15 (Crosshair Fix)</title>
     
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="theme-color" content="#000000">
@@ -13,18 +13,34 @@
     <style>
         body { margin: 0; background: #000; color: white; font-family: sans-serif; overflow: hidden; user-select: none; }
         
-        /* O Canvas ocupa toda a tela e desenha tudo (Foto, Mira, Pontos) */
+        /* Canvas: Desenha o Vídeo e a Foto */
         canvas { display: block; width: 100vw; height: 100vh; touch-action: none; }
 
-        /* UI Sobreposta */
+        /* --- MIRA FIXA (CSS) - Sempre Visível --- */
+        #cross-v {
+            position: absolute; left: 50%; top: 0; bottom: 0; width: 2px;
+            background: red; transform: translateX(-50%); z-index: 50; pointer-events: none;
+            box-shadow: 0 0 4px rgba(0,0,0,0.8);
+        }
+        #cross-h {
+            position: absolute; top: 50%; left: 0; right: 0; height: 2px;
+            background: red; transform: translateY(-50%); z-index: 50; pointer-events: none;
+            box-shadow: 0 0 4px rgba(0,0,0,0.8);
+        }
+        #center-dot {
+            position: absolute; top: 50%; left: 50%; width: 6px; height: 6px;
+            background: #00ff00; border: 2px solid white; border-radius: 50%;
+            transform: translate(-50%, -50%); z-index: 51; pointer-events: none;
+        }
+
+        /* --- UI Overlay --- */
         #ui-layer {
             position: absolute; bottom: 0; left: 0; width: 100%;
             background: rgba(10, 10, 10, 0.95); padding: 10px; box-sizing: border-box;
-            border-top: 1px solid #333; pointer-events: none; /* Deixa toque passar para o canvas */
+            border-top: 1px solid #333; pointer-events: none; 
             display: flex; flex-direction: column; gap: 10px; padding-bottom: 25px;
         }
-        /* Habilita toque apenas nos botões e inputs */
-        #ui-layer * { pointer-events: auto; }
+        #ui-layer * { pointer-events: auto; } /* Reativa toque nos botões */
 
         button {
             padding: 14px; border: none; border-radius: 8px; font-weight: bold; font-size: 1rem;
@@ -53,27 +69,29 @@
             padding: 20px 40px; border-radius: 10px; display: none; z-index: 200; font-size: 1.5rem; pointer-events: none;
         }
 
-        /* Vídeo Escondido (apenas para captura) */
-        #hidden-video { display: none; }
-        
         #reset-cam-btn {
             position: absolute; top: 10px; right: 10px; z-index: 300;
             background: rgba(0,0,0,0.6); border: 1px solid #777; color: #ccc; 
             padding: 5px 10px; border-radius: 20px; font-size: 0.7rem; cursor: pointer; pointer-events: auto;
         }
+
+        /* Video oculto para captura */
+        #hidden-video { display: none; }
     </style>
 </head>
 <body>
 
+    <div id="cross-v"></div>
+    <div id="cross-h"></div>
+    <div id="center-dot"></div>
+
     <video id="hidden-video" autoplay playsinline muted></video>
-    
     <canvas id="main-canvas"></canvas>
 
     <button id="reset-cam-btn" onclick="initCamera()">♻️ Reset Câmera</button>
     <div id="toast">SALVO!</div>
 
     <div id="ui-layer">
-        
         <div style="text-align: center; font-size: 0.8rem; color: #777;">
             Próxima Pilha: <span id="next-id" style="color: #fff; font-weight: bold;">#1</span>
         </div>
@@ -110,40 +128,35 @@
     </div>
 
     <script>
-        // --- Elementos ---
+        // --- Core ---
         const canvas = document.getElementById('main-canvas');
         const ctx = canvas.getContext('2d');
         const video = document.getElementById('hidden-video');
         
+        // UI
         const menuMain = document.getElementById('menu-main');
         const menuAction = document.getElementById('menu-action');
         const btnSave = document.getElementById('btn-save');
 
-        // --- Estado do App ---
-        let state = 'CAMERA'; // 'CAMERA' ou 'EDIT'
-        let mode = null; // 'HEIGHT', 'LENGTH'
-        
-        // --- Estado da "Câmera Virtual" (Zoom/Pan) ---
-        // A "camera" aqui é a posição (x,y) da imagem que está no centro da tela
+        // State
+        let state = 'CAMERA'; 
+        let mode = null;
         let cam = { x: 0, y: 0, scale: 1 };
-        
-        // Imagem Capturada
         let capturedImage = new Image();
         let imgLoaded = false;
         
-        // Dados da Medição
         let points = [];
         let pxPerMeter = 1;
         let pile = { h:0, l:0 };
-        let db = JSON.parse(localStorage.getItem('pinusV14')) || [];
+        let db = JSON.parse(localStorage.getItem('pinusV15')) || [];
         updateCounter();
 
-        // --- 1. Inicialização ---
+        // --- Init ---
         function resize() {
             canvas.width = window.innerWidth;
             canvas.height = window.innerHeight;
             if(state === 'CAMERA') requestAnimationFrame(loop);
-            else drawEdit(); // Redesenha se estiver editando
+            else drawEdit();
         }
         window.addEventListener('resize', resize);
         resize();
@@ -156,156 +169,116 @@
                 video.srcObject = stream;
                 video.play();
                 requestAnimationFrame(loop);
-            } catch(e) { alert("Erro Câmera: " + e.message); }
+            } catch(e) { console.error(e); }
         }
         initCamera();
 
-        // --- 2. Loop de Renderização (Game Engine) ---
+        // --- Loop Principal ---
         function loop() {
             if(state === 'CAMERA') {
-                // Desenha o vídeo ao vivo preenchendo a tela (Cover)
-                drawCover(video);
+                // Desenha vídeo preenchendo tela
+                const vw = canvas.width, vh = canvas.height;
+                const sw = video.videoWidth, sh = video.videoHeight;
                 
-                // Desenha a mira (Apenas visual, sem pontos)
-                drawCrosshair();
-                
+                if(sw) {
+                    const scale = Math.max(vw/sw, vh/sh);
+                    const w = sw * scale;
+                    const h = sh * scale;
+                    const x = (vw - w) / 2;
+                    const y = (vh - h) / 2;
+                    ctx.drawImage(video, x, y, w, h);
+                }
                 requestAnimationFrame(loop);
             }
         }
 
+        // --- Editor (Zoom/Pan) ---
         function drawEdit() {
             if(!imgLoaded) return;
             
-            // Limpa tela
+            // Fundo
             ctx.fillStyle = '#111';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             
             ctx.save();
-            
-            // 1. Move para o centro da tela
+            // Centraliza e aplica zoom na "Câmera Virtual"
             ctx.translate(canvas.width/2, canvas.height/2);
-            // 2. Aplica Zoom
             ctx.scale(cam.scale, cam.scale);
-            // 3. Move o "mundo" para a posição da câmera
             ctx.translate(-cam.x, -cam.y);
             
-            // 4. Desenha a Imagem
+            // Desenha Imagem
             ctx.drawImage(capturedImage, 0, 0);
             
-            // 5. Desenha os Marcadores (que estão fixos na imagem)
+            // Desenha Marcadores (Fixos na imagem)
             points.forEach((p, i) => {
+                const size = 15 / cam.scale; // Tamanho ajustado ao zoom
                 ctx.beginPath();
-                // Cruz do marcador
-                ctx.moveTo(p.x - 10, p.y); ctx.lineTo(p.x + 10, p.y);
-                ctx.moveTo(p.x, p.y - 10); ctx.lineTo(p.x, p.y + 10);
-                ctx.lineWidth = 3 / cam.scale; // Mantém linha fina no zoom
-                ctx.strokeStyle = (i < 2) ? 'red' : '#00ff00';
+                
+                // Cruz
+                ctx.moveTo(p.x - size, p.y); ctx.lineTo(p.x + size, p.y);
+                ctx.moveTo(p.x, p.y - size); ctx.lineTo(p.x, p.y + size);
+                
+                ctx.lineWidth = 3 / cam.scale;
+                ctx.strokeStyle = (i < 2) ? '#ff0000' : '#00ff00';
+                ctx.stroke();
+
+                // Sombra para contraste
+                ctx.lineWidth = 1 / cam.scale;
+                ctx.strokeStyle = 'black';
                 ctx.stroke();
                 
-                // Número
+                // Texto
                 ctx.fillStyle = 'white';
-                ctx.font = `bold ${20/cam.scale}px Arial`;
-                ctx.fillText(i+1, p.x + (10/cam.scale), p.y - (10/cam.scale));
+                ctx.font = `bold ${24/cam.scale}px Arial`;
+                ctx.strokeStyle = 'black';
+                ctx.lineWidth = 3/cam.scale;
+                ctx.strokeText(i+1, p.x + size, p.y - size);
+                ctx.fillText(i+1, p.x + size, p.y - size);
             });
-            
             ctx.restore();
-            
-            // 6. Desenha a Mira Fixa (Sobre tudo)
-            drawCrosshair();
         }
 
-        function drawCover(source) {
-            // Simula object-fit: cover
+        // --- Captura ---
+        function captureAndStart(m) {
+            mode = m;
             const vw = canvas.width, vh = canvas.height;
-            const sw = source.videoWidth || source.width;
-            const sh = source.videoHeight || source.height;
-            if(!sw) return;
-
+            const temp = document.createElement('canvas');
+            temp.width = vw;
+            temp.height = vh;
+            
+            // Renderiza exatamente o frame atual do vídeo (já cortado/escalado)
+            // Recriamos a lógica de drawCover aqui para "congelar"
+            const sw = video.videoWidth, sh = video.videoHeight;
             const scale = Math.max(vw/sw, vh/sh);
             const w = sw * scale;
             const h = sh * scale;
             const x = (vw - w) / 2;
             const y = (vh - h) / 2;
             
-            ctx.drawImage(source, x, y, w, h);
-            return { w, h, x, y, scale }; // Retorna métricas para captura
-        }
-
-        function drawCrosshair() {
-            const cx = canvas.width / 2;
-            const cy = canvas.height / 2;
+            temp.getContext('2d').drawImage(video, x, y, w, h);
             
-            ctx.beginPath();
-            // Linhas brancas longas
-            ctx.moveTo(0, cy); ctx.lineTo(canvas.width, cy);
-            ctx.moveTo(cx, 0); ctx.lineTo(cx, canvas.height);
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
-            ctx.lineWidth = 1;
-            ctx.stroke();
-
-            // Centro preciso
-            ctx.beginPath();
-            ctx.arc(cx, cy, 4, 0, Math.PI*2);
-            ctx.fillStyle = 'red';
-            ctx.fill();
-            ctx.stroke();
-        }
-
-        // --- 3. Lógica de Captura ---
-        function captureAndStart(m) {
-            mode = m;
-            
-            // Cria imagem congelada
-            const tempCanvas = document.createElement('canvas');
-            // Usamos a resolução nativa do vídeo para máxima qualidade
-            tempCanvas.width = video.videoWidth;
-            tempCanvas.height = video.videoHeight;
-            tempCanvas.getContext('2d').drawImage(video, 0, 0);
-            
-            capturedImage.src = tempCanvas.toDataURL('image/jpeg', 0.9);
+            capturedImage.src = temp.toDataURL('image/jpeg');
             capturedImage.onload = () => {
                 imgLoaded = true;
-                
-                // Configura câmera virtual para focar no centro da imagem inicialmente
-                // Mas precisamos ajustar para que a imagem cubra a tela (zoom inicial)
-                const metrics = getCoverMetrics(capturedImage.width, capturedImage.height);
-                cam.scale = metrics.scale;
-                cam.x = capturedImage.width / 2;
-                cam.y = capturedImage.height / 2;
+                // Centraliza a visão na imagem
+                cam.x = vw / 2;
+                cam.y = vh / 2;
+                cam.scale = 1;
                 
                 state = 'EDIT';
                 points = [];
                 
-                // UI
                 menuMain.style.display = 'none';
                 btnSave.style.display = 'none';
                 menuAction.style.display = 'flex';
-                
                 drawEdit();
             };
         }
-        
-        function getCoverMetrics(sw, sh) {
-            const vw = canvas.width, vh = canvas.height;
-            const scale = Math.max(vw/sw, vh/sh);
-            return { scale };
-        }
 
-        function exitMode() {
-            state = 'CAMERA';
-            menuAction.style.display = 'none';
-            menuMain.style.display = 'flex';
-            updateTotals();
-            requestAnimationFrame(loop);
-        }
-
-        // --- 4. Marcação (O Segredo da Precisão) ---
+        // --- Ações ---
         function addMarker() {
-            // O ponto marcado é EXATAMENTE onde a câmera está apontando
-            // Como desenhamos a imagem transladada por -cam.x, -cam.y e centralizada...
-            // O centro da tela CORRESPONDE a cam.x, cam.y na imagem.
-            // Sem contas complexas de conversão de tela!
-            
+            // O ponto marcado é sempre o centro da Câmera Virtual (cam.x, cam.y)
+            // porque a mira está no centro da tela.
             points.push({ x: cam.x, y: cam.y });
             
             if(points.length === 2) {
@@ -329,48 +302,48 @@
             drawEdit();
         }
 
-        // --- 5. Controles de Toque (Pan/Zoom) ---
+        function exitMode() {
+            state = 'CAMERA';
+            menuAction.style.display = 'none';
+            menuMain.style.display = 'flex';
+            updateTotals();
+            requestAnimationFrame(loop);
+        }
+
+        // --- Touch Zoom/Pan ---
         let lastDist = 0;
         let lastX = 0, lastY = 0;
         
         canvas.addEventListener('touchstart', e => {
             if(state !== 'EDIT') return;
-            e.preventDefault();
             if(e.touches.length === 2) {
                 lastDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
             } else {
                 lastX = e.touches[0].clientX;
                 lastY = e.touches[0].clientY;
             }
-        }, {passive: false});
+        });
 
         canvas.addEventListener('touchmove', e => {
             if(state !== 'EDIT') return;
             e.preventDefault();
             
             if(e.touches.length === 2) {
-                // Zoom
                 const dist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
-                const delta = dist / lastDist;
-                cam.scale *= delta;
-                // Limites de zoom
-                cam.scale = Math.max(0.1, Math.min(cam.scale, 10));
+                cam.scale *= (dist / lastDist);
+                cam.scale = Math.max(0.5, Math.min(cam.scale, 8)); // Limites Zoom
                 lastDist = dist;
             } else {
-                // Pan
-                // Movemos a câmera na direção OPOSTA ao dedo (arrastar papel)
-                // Dividimos pelo scale para mover na velocidade correta da imagem
-                const dx = (e.touches[0].clientX - lastX) / cam.scale;
-                const dy = (e.touches[0].clientY - lastY) / cam.scale;
-                cam.x -= dx;
-                cam.y -= dy;
+                // Pan invertido (arrasta o papel)
+                cam.x -= (e.touches[0].clientX - lastX) / cam.scale;
+                cam.y -= (e.touches[0].clientY - lastY) / cam.scale;
                 lastX = e.touches[0].clientX;
                 lastY = e.touches[0].clientY;
             }
             drawEdit();
-        }, {passive: false});
+        });
 
-        // --- 6. Dados ---
+        // --- Dados ---
         function updateTotals() {
             const w = parseFloat(document.getElementById('inp-wood').value);
             const st = (pile.h > 0 && pile.l > 0) ? (pile.h * pile.l * w) : 0;
@@ -386,7 +359,7 @@
                 h: pile.h.toFixed(2), l: pile.l.toFixed(2), w: document.getElementById('inp-wood').value,
                 st: document.getElementById('vol-total').innerText
             });
-            localStorage.setItem('pinusV14', JSON.stringify(db));
+            localStorage.setItem('pinusV15', JSON.stringify(db));
             updateCounter();
             
             pile = {h:0, l:0};
@@ -403,7 +376,7 @@
             const next = db.length ? Math.max(...db.map(i=>i.id))+1 : 1;
             document.getElementById('next-id').innerText = "#" + next;
         }
-        function clearData() { if(confirm("Apagar tudo?")) { db=[]; localStorage.setItem('pinusV14','[]'); updateCounter(); } }
+        function clearData() { if(confirm("Apagar tudo?")) { db=[]; localStorage.setItem('pinusV15','[]'); updateCounter(); } }
         function exportExcel() {
             if(!db.length) return alert("Vazio");
             const ws = XLSX.utils.json_to_sheet(db);
